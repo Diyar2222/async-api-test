@@ -1,0 +1,797 @@
+asyncapi: 2.6.0
+info:
+  title: El-Park MQTT Topics
+  version: "1.0.0"
+  description: |
+    Спецификация MQTT-топиков для системы El-Park. Описывает события,
+    связанные с камерами, шлагбаумами, сессиями, подписками, компаниями и зонами.
+
+servers:
+  mqttBroker:
+    url: wss://mqtt.hq.elpark.kz
+    protocol: mqtt
+
+channels:
+  stat/{mqttTopic}/ml/{gateId}/camera:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+      gateId:
+        description: Идентификатор камеры или шлагбаума
+        schema:
+          type: string
+    subscribe:
+      summary: Распознавание номера
+      message:
+        name: PlateRecognitionMessage
+        payload:
+          type: object
+          properties:
+            filename:
+              type: string
+              example: bcsummit_in
+            camera_id:
+              type: string
+              example: gate01
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  plate:
+                    type: string
+                    example: A123BC01
+                  score:
+                    type: number
+                    example: 0.96
+
+  stat/{mqttTopic}/gates/{gateId}/barrier/manual:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+      gateId:
+        description: Идентификатор шлагбаума
+        schema:
+          type: string
+    publish:
+      summary: Ручное управление шлагбаумом
+      message:
+        name: ManualBarrierControlMessage
+        payload:
+          type: object
+          properties:
+            action:
+              type: string
+              enum: [MANUALLY_OPEN_BARRIER, MANUALLY_CLOSE_BARRIER]
+              example: MANUALLY_OPEN_BARRIER
+            comment:
+              type: string
+              example: Test comment for reason
+
+  stat/{mqttTopic}/gates/{gateId}/barrier:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+      gateId:
+        description: Идентификатор шлагбаума
+        schema:
+          type: string
+    subscribe:
+      summary: Текущее состояние шлагбаума (открыт / закрыт)
+      message:
+        name: BarrierStateMessage
+        payload:
+          type: integer
+          enum: [0, 1]
+          example: 1
+
+  stat/{mqttTopic}/wbl:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    subscribe:
+      summary: Получение белого и чёрного списков
+      message:
+        name: WhiteBlackListMessage
+        payload:
+          type: object
+          properties:
+            whiteList:
+              type: array
+              items:
+                type: string
+              example: ["A123BC01", "B456DE02"]
+            blackList:
+              type: array
+              items:
+                type: string
+              example: ["Z999ZZ99"]
+  cmnd/{mqttTopic}/sessions/end:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Ручное завершение сессии
+      message:
+        name: EndManualSessionCommand
+        payload:
+          type: object
+          required:
+            - plate
+          properties:
+            plate:
+              type: string
+              description: Номер автомобиля, чья сессия завершается
+              example: A123BC01
+            comment:
+              type: string
+              description: Комментарий к завершению (опционально)
+              example: Завершение вручную по запросу клиента
+  stat/{mqttTopic}/sessions/end:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    subscribe:
+      summary: Завершение сессии вручную
+      message:
+        name: SessionEndMessage
+        payload:
+          type: object
+          properties:
+            type:
+              type: string
+              example: MANUAL_END
+            plate:
+              type: string
+              example: 999VMV01
+            isManualEnd:
+              type: boolean
+              example: true
+
+  cmnd/{mqttTopic}/sessions/get-none-empty-wallets:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Получение списка пользователей с ненулевым балансом
+      message:
+        name: GetNoneEmptyWalletsCommand
+        payload:
+          type: object
+          additionalProperties: false
+
+  cmnd/{mqttTopic}/plate/info:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Запрос информации по номеру машины
+      message:
+        name: PlateInfoCommand
+        payload:
+          type: object
+          properties:
+            plate:
+              type: string
+              example: A123BC01
+
+  cmnd/{mqttTopic}/create-subscription:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Создание подписки для автомобиля
+      message:
+        name: CreateSubscriptionCommand
+        payload:
+          type: object
+          properties:
+            plate:
+              type: string
+              example: A123BC01
+            phoneNumber:
+              type: string
+              example: "77029821232"
+            sum:
+              type: number
+              example: 10
+            fio:
+              type: string
+              example: Abyzbay Diyar
+            startDate:
+              type: string
+              format: date-time
+              example: "2025-05-02T15:30:00"
+            endDate:
+              type: string
+              format: date-time
+              example: "2025-05-02T17:00:00"
+            notificationSendMethod:
+              type: string
+              enum: [sms, telegram]
+              example: sms
+
+  cmnd/{mqttTopic}/company-tariff:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Установка или получение тарифов для компании
+      message:
+        name: CompanyTariffCommand
+        payload:
+          type: object
+          properties:
+            companyName:
+              type: string
+              example: Orda invest
+            data:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  tarificationType:
+                    type: string
+                    example: company_detailing
+                  minTime:
+                    type: integer
+                  maxTime:
+                    type: integer
+                  unitSum:
+                    type: number
+                  description:
+                    type: string
+            companyNames:
+              type: array
+              items:
+                type: string
+          oneOf:
+            - required: [companyName]
+            - required: [companyNames, data]
+
+  cmnd/{mqttTopic}/cfg:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Получение или обновление конфигурации зоны
+      description: |
+        Если payload пустой — запрашиваются текущие локальные настройки.
+        Если передан JSON — конфигурация шлагбаумов перезаписывается.
+      message:
+        oneOf:
+          - name: RequestZoneConfig
+            summary: Запрос текущей конфигурации (message == "")
+            payload:
+              type: object
+              description: Пустой объект для получения конфигурации
+              additionalProperties: false
+          - name: OverrideZoneConfig
+            summary: Перезапись конфигурации шлагбаумов
+            payload:
+              type: object
+              properties:
+                allowToCreateSessionOnExit:
+                  type: boolean
+                maxAllowedDebtForEntry:
+                  type: number
+                isFuzzySearchDisabled:
+                  type: boolean
+                fuzzyThresholdScore:
+                  type: number
+                plateDetectionInterval:
+                  type: number
+                freezeSumOnExit:
+                  type: boolean
+                zones:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      totalParkingSpacesQty:
+                        type: integer
+                      accessCheckTypes:
+                        type: array
+                        items:
+                          type: string
+                          enum: [WhiteList, BlackList, Payment, Subscription]
+                      maxAllowedDebtForEntry:
+                        type: number
+                        nullable: true
+                      allowEntranceWithExistingActiveSession:
+                        type: boolean
+                      declineEnterWhenExceedingParkingSpacesQty:
+                        type: boolean
+                      allowExitWithNoActiveSession:
+                        type: boolean
+                      autoEndingPreExistingActiveSessionOnEnter:
+                        type: boolean
+                      autoEndingLimits:
+                        nullable: true
+                      gates:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            type:
+                              type: string
+                            sensors:
+                              type: array
+                              items: {}
+                            zone:
+                              type: string
+                            isGateDisabled:
+                              type: boolean
+                            isGateAlwaysOpenAndBlocked:
+                              type: boolean
+                      tarifications:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            tarificationType:
+                              type: string
+                            minTime:
+                              type: integer
+                            maxTime:
+                              type: integer
+                            unitSum:
+                              type: number
+                            description:
+                              type: string
+
+  cmnd/{mqttTopic}/sessions/change-plate:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Смена номерного знака в активной сессии
+      message:
+        name: ChangePlateMessage
+        payload:
+          type: object
+          properties:
+            oldPlate:
+              type: string
+              example: OLD123
+            plate:
+              type: string
+              example: NEW456
+  cmnd/{mqttTopic}/sessions/manual:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Ручное обновление данных активной сессии
+      message:
+        name: ManualSessionUpdateCommand
+        payload:
+          type: object
+          required:
+            - plate
+            - session_data
+            - target
+            - action
+          properties:
+            plate:
+              type: string
+              example: A123BC01
+            action:
+              type: string
+              example: MANUAL_UPDATE
+            target:
+              type: string
+              example: waitingForCheck
+            session_data:
+              type: object
+              properties:
+                sum:
+                  type: number
+                  example: 100
+  stat/{mqttTopic}/sessions/manual:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Ручное обновление сессии
+      message:
+        name: ManualSessionUpdate
+        payload:
+          type: object
+          properties:
+            action:
+              type: string
+              example: MANUAL_UPDATE
+            session_data:
+              type: object
+              properties:
+                sum:
+                  type: number
+                  example: 100
+            plate:
+              type: string
+              example: A123BC01
+            target:
+              type: string
+              example: waitingForCheck
+
+  cmnd/{mqttTopic}/sessions:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Запрос всех активных сессий
+      message:
+        name: GetAllSessionsCommand
+        payload:
+          type: object
+          additionalProperties: false
+
+  cmnd/{mqttTopic}/wbl:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Получение или обновление конфигурации WBL (white/black list и подписки)
+      description: |
+        Если payload пустой — запрашивается текущая конфигурация с терминала.
+        Если передан JSON — конфигурация WBL перезаписывается.
+      message:
+        oneOf:
+          - name: RequestWBLConfig
+            summary: Запрос текущей конфигурации (message == "")
+            payload:
+              type: object
+              description: Пустой объект (или полностью отсутствующий)
+              additionalProperties: false
+
+          - name: OverrideWBLConfig
+            summary: Перезапись конфигурации WBL
+            payload:
+              type: object
+              properties:
+                whiteListHourly:
+                  type: array
+                  items:
+                    type: string
+                whiteListRangeDateTime:
+                  type: array
+                  items:
+                    type: string
+                whiteList:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      plate:
+                        type: string
+                      zones:
+                        type: array
+                        items:
+                          type: string
+                blackList:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      plate:
+                        type: string
+                      zones:
+                        type: array
+                        items:
+                          type: string
+                subscriptions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      plate:
+                        type: string
+                      sum:
+                        type: number
+                      zones:
+                        type: array
+                        items:
+                          type: string
+                      phoneNumber:
+                        type: string
+                      startDate:
+                        type: string
+                      startTime:
+                        type: string
+                      endDate:
+                        type: string
+                      endTime:
+                        type: string
+                      subscriptionStatus:
+                        type: string
+  cmnd/{mqttTopic}/gates/all:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Запрос текущего состояния всех шлагбаумов
+      description: |
+        Отправляется пустое сообщение. В ответ приходит список состояний всех шлагбаумов.
+      message:
+        name: GetAllGatesStateCommand
+        payload:
+          type: object
+          description: Пустой объект (message == "")
+          additionalProperties: false
+
+  stat/{mqttTopic}/gates/all:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    subscribe:
+      summary: состояния всех шлагбаумов
+      message:
+        name: AllGatesStateMessage
+        payload:
+          type: array
+          items:
+            type: object
+            properties:
+              value:
+                type: string
+                example: readyForPlateDetected
+              context:
+                type: object
+                properties:
+                  gateId:
+                    type: string
+                  type:
+                    type: string
+                    enum: [entry, exit]
+                  isToSkipCross:
+                    type: boolean
+                  isToSkipLoop:
+                    type: boolean
+                  isGateDisabled:
+                    type: boolean
+                  isGateAlwaysOpenAndBlocked:
+                    type: boolean
+                  isToSkipWaitingBarrierResponse:
+                    type: boolean
+  cmnd/{mqttTopic}/sessions/get-local-wallet:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Запрос локального кошелька по номеру автомобиля
+      message:
+        name: GetLocalWalletCommand
+        payload:
+          type: object
+          required:
+            - plate
+          properties:
+            plate:
+              type: string
+              description: Номер автомобиля
+              example: A123BC01
+
+  stat/{mqttTopic}/sessions/get-local-wallet:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    subscribe:
+      summary: баланс локального кошелька по номеру автомобиля
+      message:
+        name: LocalWalletResponse
+        payload:
+          type: number
+          description: Текущий баланс
+          example: 1500
+
+  cmnd/{mqttTopic}/sessions/start:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+
+    publish:
+      summary: Ручной запуск новой сессии по номеру машины и id шлагбаума
+      message:
+        name: StartManualSessionCommand
+        payload:
+          type: object
+          required:
+            - plate
+            - gate_id
+          properties:
+            plate:
+              type: string
+              description: Номер автомобиля
+              example: A123BC01
+            gate_id:
+              type: string
+              description: ID шлагбаума, с которого начинается сессия
+              example: "1"
+  cmnd/{mqttTopic}/sessions/delete:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+    publish:
+      summary: Принудительное удаление сессии по номеру автомобиля
+      message:
+        name: ForceRemoveSessionCommand
+        payload:
+          type: object
+          properties:
+            plate:
+              type: string
+              example: A123BC01
+  cmnd/{mqttTopic}/pay/{operator}:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+      operator:
+        description: Название платёжного оператора (например, kaspi, halyk, kiosk)
+        schema:
+          type: string
+    publish:
+      summary: Запрос проверки или подтверждения оплаты
+      message:
+        oneOf:
+          - name: PaymentCheckCommand
+            summary: Запрос проверки возможности оплаты по номеру авто
+            payload:
+              type: object
+              required:
+                - command
+                - txn_id
+                - txn_date
+                - account
+              properties:
+                command:
+                  type: string
+                  enum: [check]
+                  example: check
+                txn_id:
+                  type: string
+                  example: "218169303630"
+                txn_date:
+                  type: string
+                  example: "20240627175738"
+                account:
+                  type: string
+                  example: A123BC01
+          - name: PaymentMadeCommand
+            summary: Уведомление о совершённой оплате
+            payload:
+              type: object
+              required:
+                - command
+                - txn_id
+                - sum
+                - account
+                - txn_date
+              properties:
+                command:
+                  type: string
+                  enum: [pay]
+                  example: pay
+                txn_id:
+                  type: string
+                  example: "218326028220"
+                sum:
+                  type: number
+                  example: 100
+                account:
+                  type: string
+                  example: A123BC01
+                txn_date:
+                  type: string
+                  example: "20240717073450"
+  stat/{mqttTopic}/pay/{operator}:
+    parameters:
+      mqttTopic:
+        description: MQTT топик, соответствующий проекту
+        schema:
+          type: string
+      operator:
+        description: Название платёжного оператора (например, kaspi, halyk, kiosk)
+        schema:
+          type: string
+    subscribe:
+      summary: Ответ на проверку или оплату
+      message:
+        name: PaymentResponseMessage
+        payload:
+          type: object
+          properties:
+            billingResult:
+              type: string
+              description: Статус биллинга (например, SUCCESS, CLIENT_NOT_FOUND, ALREADY_PAID)
+              example: SUCCESS
+            sum:
+              type: number
+              description: Итоговая сумма к оплате
+              example: 0
+            balance:
+              type: number
+              description: Баланс пользователя
+              example: 1500
+            account:
+              type: string
+              description: Номер автомобиля
+              example: A123BC01
+            isAcceptedByBilling:
+              type: boolean
+              example: true
+            comment:
+              type: string
+              example: Client already paid before
+            entryTime:
+              type: number
+              example: 1723443434
+            sumWithNoBalance:
+              type: number
+              example: 100
+            error:
+              type: string
+              description: Сообщение об ошибке (если возникла)
+              example: Client is not found
